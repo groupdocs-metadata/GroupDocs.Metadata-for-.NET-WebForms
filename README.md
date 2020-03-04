@@ -1,3 +1,4 @@
+![Alt text](https://groupdocs-metadata.github.io/resources/image/banner.png "GroupDocs.Metadata")
 # GroupDocs.Metadata for .NET WebForms Example
 
 [![Build status](https://ci.appveyor.com/api/projects/status/a3j425uq25nyy1l7/branch/master?svg=true)](https://ci.appveyor.com/project/bobkovalex/groupdocs-metadata-for-net-webforms/branch/master)
