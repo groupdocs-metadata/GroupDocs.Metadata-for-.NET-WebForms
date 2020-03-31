@@ -147,6 +147,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AppDomainGenerator\DomainGenerator.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
     <Compile Include="Products\Common\Config\ApplicationConfiguration.cs" />
