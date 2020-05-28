@@ -7,6 +7,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
     <title>Metadata for .NET Web Forms</title>
     <link rel="icon" type="image/x-icon" href="resources/metadata/favicon.ico" />
 </head>
