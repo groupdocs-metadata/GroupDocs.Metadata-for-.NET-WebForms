@@ -1,5 +1,12 @@
-﻿using GroupDocs.Metadata.WebForms.Products.Common.Entity.Web;
+﻿using GroupDocs.Metadata.Common;
+using GroupDocs.Metadata.Formats.Document;
+using GroupDocs.Metadata.Options;
+using GroupDocs.Metadata.Tagging;
+using GroupDocs.Metadata.WebForms.Products.Common.Entity.Web;
 using GroupDocs.Metadata.WebForms.Products.Common.Resources;
+using GroupDocs.Metadata.WebForms.Products.Common.Util.Comparator;
+using GroupDocs.Metadata.WebForms.Products.Metadata.Config;
+using GroupDocs.Metadata.WebForms.Products.Metadata.Entity;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,13 +17,6 @@ using System.Net.Http.Headers;
 using System.Web;
 using System.Web.Http;
 using System.Web.Http.Cors;
-using GroupDocs.Metadata.WebForms.Products.Metadata.Config;
-using GroupDocs.Metadata.WebForms.Products.Common.Util.Comparator;
-using GroupDocs.Metadata.Common;
-using GroupDocs.Metadata.Options;
-using GroupDocs.Metadata.Tagging;
-using GroupDocs.Metadata.Formats.Document;
-using GroupDocs.Metadata.WebForms.Products.Metadata.Entity;
 
 namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
 {
@@ -26,6 +26,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
     [EnableCors(origins: "*", headers: "*", methods: "*")]
     public class MetadataApiController : ApiController
     {
+        private static List<string> SupportedImageFormats = new List<string> { ".bmp", ".jpeg", ".jpg", ".tiff", ".tif", ".png", ".gif", ".emf", ".wmf", ".dwg", ".dicom", ".djvu" };
         private readonly Common.Config.GlobalConfiguration globalConfiguration;
 
         /// <summary>
@@ -33,29 +34,28 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
         /// </summary>
         public MetadataApiController()
         {
-            // Check if filesDirectory is relative or absolute path           
+            // Check if filesDirectory is relative or absolute path
             globalConfiguration = new Common.Config.GlobalConfiguration();
         }
 
         /// <summary>
         /// Load Metadata configuration
-        /// </summary>       
+        /// </summary>
         /// <returns>Metadata configuration</returns>
         [HttpGet]
         [Route("loadConfig")]
         public MetadataConfiguration LoadConfig()
-        {            
+        {
             return globalConfiguration.Metadata;
         }
 
         /// <summary>
         /// Get all files and directories from storage
         /// </summary>
-        /// <param name="postedData">Post data</param>
         /// <returns>List of files and directories</returns>
         [HttpPost]
         [Route("loadFileTree")]
-        public HttpResponseMessage loadFileTree(PostedDataEntity postedData)
+        public HttpResponseMessage loadFileTree()
         {
             try
             {
@@ -96,18 +96,19 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
             }
         }
 
-        private static IList<FilePropertyEntity> GetFileProperties(PostedDataEntity postedData, FilePropertyCategory filePropertyCategory) {
-
+        public static IList<FilePropertyEntity> GetFileProperties(PostedDataEntity postedData, FilePropertyCategory filePropertyCategory)
+        {
             List<FilePropertyEntity> outputProperties = new List<FilePropertyEntity>();
+            string password = (string.IsNullOrEmpty(postedData.password)) ? null : postedData.password;
+            string filePath = postedData.guid;
 
-            string password = (String.IsNullOrEmpty(postedData.password)) ? null : postedData.password;
-            // set password for protected document                
+            // set password for protected document
             var loadOptions = new LoadOptions
             {
                 Password = password
             };
 
-            using (GroupDocs.Metadata.Metadata metadata = new GroupDocs.Metadata.Metadata(postedData.guid, loadOptions))
+            using (GroupDocs.Metadata.Metadata metadata = new GroupDocs.Metadata.Metadata(filePath, loadOptions))
             {
                 if (filePropertyCategory == FilePropertyCategory.BuildIn)
                 {
@@ -116,11 +117,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
                         // Fetch all properties having a specific type and value
                         IEnumerable<MetadataProperty> buildInProperties = metadata.FindProperties(p => p.Value.RawValue != null
                                                                                                     && !string.Empty.Equals(p.Value.RawValue)
-                                                                                                    && (!p.Value.RawValue.GetType().IsValueType 
-                                                                                                        || !p.Value.RawValue.Equals(Activator.CreateInstance(p.Value.RawValue.GetType())))
-                                                                                                    && p.Tags.Contains(Tags.Document.BuiltIn)
-                                                                                                    && (p.Value.Type == MetadataPropertyType.String
-                                                                                                        || p.Value.Type == MetadataPropertyType.DateTime));
+                                                                                                    && p.Tags.Contains(Tags.Document.BuiltIn));
 
                         foreach (var buildInProperty in buildInProperties)
                         {
@@ -139,13 +136,20 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
 
                 else if (filePropertyCategory == FilePropertyCategory.Default)
                 {
-                    // Fetch all metadata properties that fall into a particular category
-                    IEnumerable<MetadataProperty> defaultProperties = metadata.FindProperties(p => p.Value.RawValue != null
-                                                                                                && !string.Empty.Equals(p.Value.RawValue)
-                                                                                                && (!p.Value.RawValue.GetType().IsValueType
-                                                                                                    || !p.Value.RawValue.Equals(Activator.CreateInstance(p.Value.RawValue.GetType())))
-                                                                                                && p.Tags.Any(t => t.Category == Tags.Content));
-
+                    IEnumerable<MetadataProperty> defaultProperties;
+                    if (SupportedImageFormats.Contains(Path.GetExtension(filePath)))
+                    {
+                        // Fetch all metadata properties that fall into a particular category
+                        defaultProperties = metadata.FindProperties(p => p.Value.RawValue != null
+                                                                      && !string.Empty.Equals(p.Value.RawValue));
+                    }
+                    else
+                    {
+                        // Fetch all metadata properties that fall into a particular category
+                        defaultProperties = metadata.FindProperties(p => p.Value.RawValue != null
+                                                                      && !string.Empty.Equals(p.Value.RawValue)
+                                                                      && p.Tags.Any(t => t.Category == Tags.Content));
+                    }
                     foreach (var defaultProperty in defaultProperties)
                     {
                         var outputProperty = new FilePropertyEntity
@@ -156,6 +160,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
                             category = FilePropertyCategory.Default,
                             original = true
                         };
+
                         outputProperties.Add(outputProperty);
                     }
                 }
@@ -164,15 +169,17 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
             return outputProperties.OrderBy(p => p.name, new CaseInsensitiveComparer()).ToList();
         }
 
-        private static dynamic GetPropertyValue(MetadataProperty property) {
-            switch (property.Value.Type) 
+        private static dynamic GetPropertyValue(MetadataProperty property)
+        {
+            switch (property.Value.Type)
             {
                 case MetadataPropertyType.String:
                     return property.Value.ToClass<string>();
                 case MetadataPropertyType.DateTime:
                     return property.Value.ToStruct(DateTime.MinValue);
                 case MetadataPropertyType.Integer:
-                    if (property.Name.ToLower().Contains("fileformat")) {
+                    if (property.Name.ToLower().Contains("fileformat"))
+                    {
                         return ((FileFormat)property.Value.RawValue).ToString();
                     }
                     else
@@ -203,8 +210,8 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
 
                 using (GroupDocs.Metadata.Metadata metadata = new GroupDocs.Metadata.Metadata(postedData.guid, GetLoadOptions(postedData)))
                 {
-                    foreach (var property in (metadata.GetRootPackage().FindProperties(p =>
-                        p.Value.ToClass<DocumentPackage>() != null)))
+                    foreach (var property in metadata.GetRootPackage().FindProperties(p =>
+                        p.Value.ToClass<DocumentPackage>() != null))
                     {
                         foreach (var descriptor in property.Value.ToClass<DocumentPackage>().KnowPropertyDescriptors
                             .Where(d => !buildInProperties.Select(op => op.name.ToLower()).Contains(d.Name.ToLower())
@@ -273,12 +280,13 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
 
         private static LoadOptions GetLoadOptions(PostedDataEntity postedData)
         {
-            string password = (String.IsNullOrEmpty(postedData.password)) ? null : postedData.password;
-            // set password for protected document                
+            string password = (string.IsNullOrEmpty(postedData.password)) ? null : postedData.password;
+            // set password for protected document
             var loadOptions = new LoadOptions
             {
                 Password = password
             };
+
             return loadOptions;
         }
 
@@ -313,7 +321,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
 
                 return Request.CreateResponse(HttpStatusCode.OK, new object());
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 return Request.CreateResponse(HttpStatusCode.InternalServerError, Resources.GenerateException(ex));
             }
@@ -342,6 +350,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
                 // check if current file/folder is hidden
                 if (!(tempDirectoryName.Equals(Path.GetFileName(file)) ||
                     fileInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
+                    fileInfo.Name.StartsWith(".") ||
                     Path.GetFileName(file).Equals(Path.GetFileName(globalConfiguration.Metadata.GetFilesDirectory()))))
                 {
                     FileDescriptionEntity fileDescription = new FileDescriptionEntity();
@@ -378,7 +387,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
                 // return document description
                 return Request.CreateResponse(HttpStatusCode.OK, loadDocumentEntity);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 // set exception message
                 // TODO: return InternalServerError for common Exception and Forbidden for PasswordProtectedException
@@ -470,8 +479,10 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
                         client.DownloadFile(url, fileSavePath);
                     }
                 }
+
                 UploadedDocumentEntity uploadedDocument = new UploadedDocumentEntity();
                 uploadedDocument.guid = fileSavePath;
+
                 return Request.CreateResponse(HttpStatusCode.OK, uploadedDocument);
             }
             catch (Exception ex)
@@ -485,16 +496,16 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
         {
             // get/set parameters
             string documentGuid = postedData.guid;
-            string password = (String.IsNullOrEmpty(postedData.password)) ? null : postedData.password;
+            string password = string.IsNullOrEmpty(postedData.password) ? null : postedData.password;
             LoadDocumentEntity loadDocumentEntity = new LoadDocumentEntity();
-            
+
             // check if documentGuid contains path or only file name
             if (!Path.IsPathRooted(documentGuid))
             {
                 documentGuid = globalConfiguration.Metadata.GetFilesDirectory() + "/" + documentGuid;
             }
 
-            // set password for protected document                
+            // set password for protected document
             var loadOptions = new LoadOptions
             {
                 Password = password
@@ -504,7 +515,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
             // TODO: make it more DRY
             using (GroupDocs.Metadata.Metadata metadata = new GroupDocs.Metadata.Metadata(postedData.guid, loadOptions))
             {
-                 pages = metadata.GetDocumentInfo().Pages;
+                pages = metadata.GetDocumentInfo().Pages;
             }
 
             var pagesContent = GetAllPagesContent(password, documentGuid, pages);
@@ -518,9 +529,9 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
                 }
                 loadDocumentEntity.SetPages(pageData);
             }
-            
+
             loadDocumentEntity.SetGuid(documentGuid);
-            
+
             // return document description
             return loadDocumentEntity;
         }
@@ -541,7 +552,7 @@ namespace GroupDocs.Metadata.WebForms.Products.Metadata.Controllers
             for (int i = 0; i < pages.Count; i++)
             {
                 byte[] bytes;
-                using (var memoryStream = RenderPageToMemoryStream(i+1, documentGuid, password ))
+                using (var memoryStream = RenderPageToMemoryStream(i + 1, documentGuid, password))
                 {
                     bytes = memoryStream.ToArray();
                 }
