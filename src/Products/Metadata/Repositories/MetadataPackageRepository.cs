@@ -3,7 +3,6 @@ using GroupDocs.Metadata.WebForms.Products.Metadata.Model;
 using System;
 using System.Collections.Generic;
 
-
 namespace GroupDocs.Metadata.WebForms.Products.Metadata.Repositories
 {
     public abstract class MetadataPackageRepository
