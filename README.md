@@ -5,6 +5,8 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a2e18087c19f4898abc65cc48c3f57f6)](https://www.codacy.com/gh/groupdocs-metadata/GroupDocs.Metadata-for-.NET-WebForms?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=groupdocs-metadata/GroupDocs.Metadata-for-.NET-WebForms&amp;utm_campaign=Badge_Grade)
 [![GitHub license](https://img.shields.io/github/license/groupdocs-metadata/GroupDocs.Metadata-for-.NET-WebForms.svg)](https://github.com/groupdocs-metadata/GroupDocs.Metadata-for-.NET-WebForms/blob/master/LICENSE)
 
+:warning: **This repository has moved to https://github.com/groupdocs-metadata/GroupDocs.Metadata-for-.NET/tree/master/Demos/WebForms**
+
 ## System Requirements
 - .NET Framework 4.5
 - Visual Studio 2015
